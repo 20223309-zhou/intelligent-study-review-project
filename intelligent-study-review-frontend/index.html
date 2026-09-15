@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智能试卷生成器</title>
+    <!--
+      站点图标（源文件在 public/favicon.png，构建时原样复制到产物根目录）。
+      这里用相对路径是刻意的：路由是 hash 模式（createWebHashHistory），文档路径恒为部署根
+      —— 形如 /#/paper/123 —— 所以 ./favicon.png 永远解析到部署根下的 favicon.png，
+      不会像 history 路由那样在深层路由下被解析成 /paper/favicon.png。
+      用相对路径还能同时兼容子目录部署（配合 vite.config.js 的 base: './'）。
+    -->
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <!-- iOS「添加到主屏幕」用它，不加会拿网页截图当图标 -->
+    <link rel="apple-touch-icon" href="./favicon.png" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

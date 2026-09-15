@@ -1,0 +1,210 @@
+:root {
+  /* ===== 主色调 - 竹绿（淡绿）===== */
+  --color-primary: #12924a;
+  --color-primary-light: #4cc27d;
+  --color-primary-dark: #0b7239;
+  --color-primary-bg: #e4f6ec;
+  --color-primary-soft: #f3fbf6;
+  --color-primary-border: #a9dcbf;
+  --color-primary-gradient: linear-gradient(135deg, #1fa85c, #0f8a62);
+  /* 深色品牌面：用于要承载白色文字的整块区域（如登录页品牌区）。
+     浅色渐变配白字对比度只有 3:1 左右，小号文字会读不清，故单独一档。 */
+  --color-primary-gradient-deep: linear-gradient(135deg, #0d7d43, #0a6134);
+
+  /* ===== 功能色 =====
+     注意：品牌已是绿色，因此 success 保留为「偏青的薄荷绿」，
+     与主色（草绿）在色相上错开约 18°，避免「答对」与「主色」混淆。 */
+  --color-success: #10b981;
+  --color-success-dark: #047857;
+  --color-warning: #f59e0b;
+  --color-warning-dark: #b45309;
+  --color-error: #ef4444;
+  --color-error-dark: #dc2626;
+  --color-info: #3b82f6;
+
+  /* 功能色 - 浅底 / 描边 / 深字（徽标、状态标记、提示条） */
+  --color-success-bg: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-success-text: #047857;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fcd34d;
+  --color-warning-text: #b45309;
+  --color-warning-bg-strong: #fef3c7;
+  --color-error-bg: #fef2f2;
+  --color-error-border: #fecaca;
+  --color-error-text: #b91c1c;
+  --color-info-bg: #eff6ff;
+  --color-info-border: #bfdbfe;
+  --color-info-text: #1d4ed8;
+  --color-neutral-bg: #eff3f0;
+  --color-neutral-border: #dfe7e1;
+  --color-neutral-text: #4b5563;
+
+  /* ===== 中性色（带极轻的绿灰调，保证整站色调统一）===== */
+  --color-bg: #edf4ef;
+  --color-surface: #ffffff;
+  --color-border: #dfe7e1;
+  --color-border-strong: #c2d1c7;
+  --color-border-light: #edf2ee;
+  --color-text-primary: #1f2a24;
+  --color-text-secondary: #5a6a60;
+  --color-text-muted: #8b9c92;
+  --color-text-inverse: #ffffff;
+
+  /* ===== 页面背景装饰：三层柔光叠加，避免整页单一底色 ===== */
+  --bg-wash-a: rgba(34, 170, 96, 0.18);
+  --bg-wash-b: rgba(13, 148, 136, 0.14);
+  --bg-wash-c: rgba(132, 178, 44, 0.12);
+
+  /* 焦点环 / 品牌投影 */
+  --ring-primary: 0 0 0 3px rgba(18, 146, 74, 0.14);
+  --ring-error: 0 0 0 3px rgba(239, 68, 68, 0.12);
+  --shadow-primary: 0 2px 8px rgba(18, 146, 74, 0.28);
+  --shadow-primary-lg: 0 4px 14px rgba(18, 146, 74, 0.36);
+  --color-overlay: rgba(16, 32, 24, 0.42);
+
+  /* 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(23, 46, 33, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(23, 46, 33, 0.07), 0 2px 4px -2px rgba(23, 46, 33, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(23, 46, 33, 0.09), 0 4px 6px -4px rgba(23, 46, 33, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(23, 46, 33, 0.11), 0 8px 10px -6px rgba(23, 46, 33, 0.05);
+  /* 向上投影：用于吸底栏，让它从页面上浮起来 */
+  --shadow-up: 0 -6px 18px rgba(23, 46, 33, 0.07);
+
+  /* 字体族 */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-serif: 'Songti SC', 'SimSun', 'Noto Serif CJK SC', 'Source Han Serif SC', serif;
+
+  /* 字体尺度（8 级，下限 12px，避免出现 10/11px 的不可读字号） */
+  --fs-2xs: 0.75rem;    /* 12px · 角标、徽标、内联提示 */
+  --fs-xs: 0.8125rem;   /* 13px · 辅助信息、时间、次要标签 */
+  --fs-sm: 0.875rem;    /* 14px · 正文小、按钮、表单标签 */
+  --fs-md: 0.9375rem;   /* 15px · 默认正文 */
+  --fs-lg: 1.0625rem;   /* 17px · 小标题、强调数值 */
+  --fs-xl: 1.25rem;     /* 20px · 卡片标题 */
+  --fs-2xl: 1.5rem;     /* 24px · 页面标题 */
+  --fs-3xl: 1.875rem;   /* 30px · 主视觉标题 */
+
+  /* 行高 */
+  --lh-tight: 1.35;
+  --lh-snug: 1.5;
+  --lh-normal: 1.65;
+  --lh-relaxed: 1.85;
+  --lh-loose: 2;
+
+  /* 字重 */
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-heavy: 800;
+
+  /* 容器宽度 —— 全站统一由 layout 决定，页面自身不再写 max-width，避免跨页错位 */
+  --container: 1120px;
+  --paper-measure: 820px;        /* 卷面（白纸）阅读宽度 */
+  --paper-measure-wide: 1080px;  /* 答题态：卷面 + 答题卡 */
+
+  /* 过渡 */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+
+  /* 断点约定（媒体查询无法使用变量，此处仅作文档）
+     --bp-sm: 640px  --bp-md: 768px  --bp-lg: 900px */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* 页面底色放在 html 上（body 一旦设背景会传播到 canvas，反而盖住装饰层） */
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg);
+}
+
+/* 背景装饰层：用 position: fixed 的伪元素而不是 background-attachment: fixed，
+   后者在 iOS Safari 下会被忽略导致柔光错位。z-index: -1 让它在底色之上、内容之下。 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1000px 640px at 6% -14%, var(--bg-wash-a), transparent 62%),
+    radial-gradient(880px 560px at 98% 2%, var(--bg-wash-b), transparent 60%),
+    radial-gradient(1100px 720px at 46% 116%, var(--bg-wash-c), transparent 66%);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  color: var(--color-text-primary);
+  line-height: var(--lh-normal);
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: var(--radius-full);
+}

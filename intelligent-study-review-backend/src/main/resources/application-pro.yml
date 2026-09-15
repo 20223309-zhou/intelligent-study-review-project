@@ -1,0 +1,23 @@
+spring:
+  # MySQL 数据库配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_URL:localhost}:${MYSQL_PORT:3306}/intelligent_study_review
+    username: root
+    password: ${MYSQL_PASSWORD:1234}
+  # Redis 配置
+  data:
+    redis:
+      host: ${REDIS_URL:localhost}
+      port: ${REDIS_PORT:6379}
+      database: 0
+      password: ${REDIS_PASSWORD:123456}
+  ai:
+    openai:
+      api-key: ${AI_API_KEY}
+      base-url: https://api.deepseek.com
+      chat:
+        options:
+          model: deepseek-v4-flash
+          temperature: 0.7
+          max-tokens: 8192

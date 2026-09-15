@@ -1,0 +1,34 @@
+# ============================================================
+# 工作区数据：不参与版本管理
+# .workbuddy/ 是本地工作数据（项目记忆等），不属于源码
+# ============================================================
+.workbuddy/
+
+# ============================================================
+# 后端（intelligent-study-review-backend）
+# 注：该目录下另有一份 .gitignore，两者同时生效；
+#     这里显式重复关键规则，避免那份被误删后密钥被提交。
+# ============================================================
+intelligent-study-review-backend/target/
+intelligent-study-review-backend/.idea/
+intelligent-study-review-backend/*.iml
+intelligent-study-review-backend/HELP.md
+# 含明文 DB / Redis 口令与 AI api-key，禁止入库
+intelligent-study-review-backend/src/main/resources/application-dev.yml
+.mvn/wrapper/maven-wrapper.jar
+
+# ============================================================
+# 前端（intelligent-study-review-frontend）
+# 该目录原先没有 .gitignore，node_modules 处于"未跟踪也未忽略"状态
+# ============================================================
+intelligent-study-review-frontend/node_modules/
+intelligent-study-review-frontend/dist/
+intelligent-study-review-frontend/.vite/
+
+# ============================================================
+# 通用
+# ============================================================
+.DS_Store
+Thumbs.db
+*.iws
+*.ipr
