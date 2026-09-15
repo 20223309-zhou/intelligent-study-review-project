@@ -10,12 +10,15 @@
 #     这里显式重复关键规则，避免那份被误删后密钥被提交。
 # ============================================================
 intelligent-study-review-backend/target/
-intelligent-study-review-backend/.idea/
-intelligent-study-review-backend/*.iml
 intelligent-study-review-backend/HELP.md
 # 含明文 DB / Redis 口令与 AI api-key，禁止入库
 intelligent-study-review-backend/src/main/resources/application-dev.yml
 .mvn/wrapper/maven-wrapper.jar
+
+# IDE 配置：用不带前缀的写法，同时覆盖根目录与各子目录下的 .idea/
+# （原先只写了 intelligent-study-review-backend/.idea/，漏掉了根目录那个）
+.idea/
+*.iml
 
 # ============================================================
 # 前端（intelligent-study-review-frontend）
