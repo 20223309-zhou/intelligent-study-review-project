@@ -5,6 +5,7 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiCard from '@/components/ui/UiCard.vue'
 import UiBadge from '@/components/ui/UiBadge.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
+import PageDecor from '@/components/PageDecor.vue'
 import { createGenerationStream } from '@/utils/generationStream.js'
 
 const API_BASE = '/api'
@@ -256,6 +257,8 @@ async function handleSubmit() {
 
 <template>
   <div class="exam-generator">
+    <PageDecor />
+
     <div class="page-intro">
       <h1 class="page-title">智能试卷生成器</h1>
       <p class="page-desc">三步完成试卷配置，快速生成符合需求的试卷</p>

@@ -120,8 +120,7 @@
 
   /* 容器宽度 —— 全站统一由 layout 决定，页面自身不再写 max-width，避免跨页错位 */
   --container: 1120px;
-  --paper-measure: 820px;        /* 卷面（白纸）阅读宽度 */
-  --paper-measure-wide: 1080px;  /* 答题态：卷面 + 答题卡 */
+  --paper-measure: 820px;        /* 卷面（白纸）固定宽度：小屏靠 zoom 等比缩小，不重排 */
 
   /* 过渡 */
   --transition-fast: 150ms ease;

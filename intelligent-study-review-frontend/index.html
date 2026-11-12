@@ -15,6 +15,15 @@
     <!-- iOS「添加到主屏幕」用它，不加会拿网页截图当图标 -->
     <link rel="apple-touch-icon" href="./favicon.png" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!--
+      KaTeX：把 AI 生成的 $...$ / $$...$$ 渲染成真正的数学公式。
+      走 CDN 而非 npm 依赖，与 html2pdf 保持同一策略（项目本身不打包第三方 UI 库）。
+      加载失败时 MathText.vue 会原样显示 LaTeX 源码，不影响作答与判分。
+      auto-render 依赖 katex.min.js，两条都要 defer 且顺序不可颠倒。
+    -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   </head>
   <body>
     <div id="app"></div>

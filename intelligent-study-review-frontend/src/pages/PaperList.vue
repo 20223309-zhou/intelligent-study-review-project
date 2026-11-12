@@ -5,6 +5,7 @@ import { confirmDialog, toastError } from '@/utils/ui.js'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiSpinner from '@/components/ui/UiSpinner.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
+import PageDecor from '@/components/PageDecor.vue'
 
 const API_BASE = '/api'
 const router = useRouter()
@@ -67,6 +68,8 @@ onMounted(() => fetchPapers())
 
 <template>
   <div class="paper-list-page">
+    <PageDecor />
+
     <div class="page-header">
       <h1 class="page-title">我的试卷</h1>
       <UiButton to="/" variant="primary" size="sm">
