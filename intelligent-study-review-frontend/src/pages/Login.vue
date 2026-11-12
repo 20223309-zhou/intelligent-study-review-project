@@ -127,12 +127,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <AuthShell>
-    <div class="auth-header">
-      <h1 class="auth-title">欢迎回来</h1>
-      <p class="auth-subtitle">登录后即可生成、批改与管理试卷</p>
-    </div>
-
+  <AuthShell title="登录" subtitle="登录后即可生成、批改与管理试卷">
     <form class="auth-form" @submit.prevent="handleSubmit">
       <div class="form-group">
         <label class="form-label" for="login-account">用户名</label>
@@ -211,71 +206,16 @@ async function handleSubmit() {
       </UiButton>
     </form>
 
-    <div class="auth-footer">
+    <template #footer>
       还没有账号？
       <router-link to="/register" class="auth-link">立即注册</router-link>
-    </div>
+    </template>
   </AuthShell>
 </template>
 
 <style scoped>
-.auth-header { margin-bottom: var(--space-8); }
-
-.auth-title {
-  font-size: var(--fs-2xl);
-  font-weight: var(--fw-heavy);
-  color: var(--color-text-primary);
-}
-
-.auth-subtitle {
-  margin-top: var(--space-2);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.form-label {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--color-text-secondary);
-}
-
-/* 固定 48px 高：既是舒适的点击高度，也让「验证码输入框 + 图片」严丝合缝对齐 */
-.form-input {
-  width: 100%;
-  height: 48px;
-  padding: 0 var(--space-4);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  /* 16px 起，避免 iOS 聚焦时页面自动缩放 */
-  font-size: 1rem;
-  transition: all var(--transition-fast);
-  outline: none;
-}
-
-.form-input:focus {
-  border-color: var(--color-primary-light);
-  box-shadow: var(--ring-primary);
-}
-
-.form-input.has-error { border-color: var(--color-error); }
-.form-input.has-error:focus { box-shadow: var(--ring-error); }
-.form-input::placeholder { color: var(--color-text-muted); }
-
-/* ===== 验证码 ===== */
+/* 表单字段的样式统一放在 AuthShell 里（Login 与 Register 共用），
+   这里只保留登录页独有的验证码部分。 */
 .captcha-row {
   display: flex;
   align-items: stretch;
@@ -292,15 +232,16 @@ async function handleSubmit() {
   width: 130px;
   height: 48px;
   padding: 0;
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   background: var(--color-bg);
   overflow: hidden;
   cursor: pointer;
   transition: border-color var(--transition-fast);
 }
-.captcha-box:hover:not(:disabled) { border-color: var(--color-primary-light); }
+.captcha-box:hover:not(:disabled) { border-color: var(--color-primary); }
 .captcha-box:disabled { cursor: wait; opacity: 0.7; }
+.captcha-box.is-loading { opacity: 0.7; }
 .captcha-box img {
   display: block;
   width: 100%;
@@ -317,36 +258,7 @@ async function handleSubmit() {
   color: var(--color-text-muted);
 }
 
-.field-error {
-  font-size: var(--fs-xs);
-  color: var(--color-error);
-}
-
-.form-error {
-  text-align: center;
-  font-size: var(--fs-sm);
-  color: var(--color-error-text);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-error-bg);
-  border: 1px solid var(--color-error-border);
-  border-radius: var(--radius-md);
-}
-
-.auth-footer {
-  margin-top: var(--space-6);
-  text-align: center;
-  font-size: var(--fs-sm);
-  color: var(--color-text-secondary);
-}
-
-.auth-link {
-  color: var(--color-primary);
-  font-weight: var(--fw-semibold);
-}
-.auth-link:hover { text-decoration: underline; }
-
 @media (max-width: 480px) {
-  .auth-title { font-size: var(--fs-xl); }
   .captcha-box { width: 110px; }
 }
 </style>

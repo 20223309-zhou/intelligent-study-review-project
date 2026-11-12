@@ -95,12 +95,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <AuthShell>
-    <div class="auth-header">
-      <h1 class="auth-title">创建账号</h1>
-      <p class="auth-subtitle">注册后即可使用智能试卷生成器</p>
-    </div>
-
+  <AuthShell title="创建账号" subtitle="创建账号后即可生成、批改与管理试卷">
     <form class="auth-form" @submit.prevent="handleSubmit">
       <div class="form-group">
         <label class="form-label" for="reg-account">用户名</label>
@@ -165,109 +160,9 @@ async function handleSubmit() {
       </UiButton>
     </form>
 
-    <div class="auth-footer">
+    <template #footer>
       已有账号？
       <router-link to="/login" class="auth-link">立即登录</router-link>
-    </div>
+    </template>
   </AuthShell>
 </template>
-
-<style scoped>
-.auth-header { margin-bottom: var(--space-8); }
-
-.auth-title {
-  font-size: var(--fs-2xl);
-  font-weight: var(--fw-heavy);
-  color: var(--color-text-primary);
-}
-
-.auth-subtitle {
-  margin-top: var(--space-2);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.form-label {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--color-text-secondary);
-}
-
-/* 固定 48px 高，与登录页一致 */
-.form-input {
-  width: 100%;
-  height: 48px;
-  padding: 0 var(--space-4);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  /* 16px 起，避免 iOS 聚焦时页面自动缩放 */
-  font-size: 1rem;
-  transition: all var(--transition-fast);
-  outline: none;
-}
-
-.form-input:focus {
-  border-color: var(--color-primary-light);
-  box-shadow: var(--ring-primary);
-}
-
-.form-input.has-error { border-color: var(--color-error); }
-.form-input.has-error:focus { box-shadow: var(--ring-error); }
-.form-input::placeholder { color: var(--color-text-muted); }
-
-.field-error {
-  font-size: var(--fs-xs);
-  color: var(--color-error);
-}
-
-.form-error {
-  text-align: center;
-  font-size: var(--fs-sm);
-  color: var(--color-error-text);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-error-bg);
-  border: 1px solid var(--color-error-border);
-  border-radius: var(--radius-md);
-}
-
-.form-success {
-  text-align: center;
-  font-size: var(--fs-sm);
-  color: var(--color-success-text);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-success-bg);
-  border: 1px solid var(--color-success-border);
-  border-radius: var(--radius-md);
-}
-
-.auth-footer {
-  margin-top: var(--space-6);
-  text-align: center;
-  font-size: var(--fs-sm);
-  color: var(--color-text-secondary);
-}
-
-.auth-link {
-  color: var(--color-primary);
-  font-weight: var(--fw-semibold);
-}
-.auth-link:hover { text-decoration: underline; }
-
-@media (max-width: 480px) {
-  .auth-title { font-size: var(--fs-xl); }
-}
-</style>
