@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -52,36 +51,14 @@ public class SseProgressSink implements GenerationProgressSink {
 
     @Override
     public void stage(String node, String agent, int round) {
-        String key = agent != null && !agent.isBlank() ? agent : node;
+        // 标签由 StageLabels 统一产出（去重那边用的也是它，两边必须同源）
+        String label = StageLabels.of(node, agent);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("node", node == null ? "" : node);
         data.put("agent", agent == null ? "" : agent);
         data.put("round", round);
-        data.put("label", resolveLabel(key));
+        data.put("label", label != null ? label : StageLabels.key(node, agent));
         send("stage", data);
-    }
-
-    /**
-     * 把节点名翻译成给用户看的中文。用 contains 而非全等匹配：
-     * 框架实际给出的节点名带层级前缀（实测为 subgraph_planner_agent / subgraph_reviewer_agent），
-     * 全等匹配会全部落空并把英文名直接甩到界面上。
-     * 匹配不到则原样返回，保证新增/重命名 Agent 时进度不会空白。
-     */
-    private static String resolveLabel(String key) {
-        if (key == null || key.isBlank()) {
-            return "";
-        }
-        String k = key.toLowerCase(Locale.ROOT);
-        if (k.contains("planner")) {
-            return "正在规划试卷结构";
-        }
-        if (k.contains("writer")) {
-            return "正在生成题目";
-        }
-        if (k.contains("review")) {
-            return "正在做质量审查";
-        }
-        return key;
     }
 
     @Override

@@ -62,3 +62,33 @@ CREATE TABLE IF NOT EXISTS `exam_paper`  (
                                PRIMARY KEY (`id`) USING BTREE,
                                INDEX `idx_userId`(`userId` ASC) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '试卷主表' ROW_FORMAT = Dynamic;
+
+-- 生成日志表：一次「生成试卷」写一行，成功失败都记
+CREATE TABLE IF NOT EXISTS `generation_log`
+(
+    `id`               bigint        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `traceId`          varchar(64)   NULL COMMENT '图执行ID（OverAllState 的 _graph_execution_id_），串起这次生成的所有环节',
+    `userId`           bigint        NULL COMMENT '发起生成的用户ID',
+    `paperId`          bigint        NULL COMMENT '生成的试卷ID，失败时为空',
+    `paperName`        varchar(512)  NULL COMMENT '试卷名称（冗余留存，试卷被改名或删除后仍可追溯）',
+    `subject`          varchar(256)  NULL COMMENT '学科',
+    `gradeOrLevel`     varchar(128)  NULL COMMENT '年级或专业层次',
+    `model`            varchar(128)  NULL COMMENT '使用的模型，如 deepseek-v4.1-flash',
+    `status`           tinyint       NOT NULL DEFAULT 1 COMMENT '状态：1-成功 2-失败',
+    `errorMsg`         varchar(1024) NULL COMMENT '失败原因（异常类名+首行信息，不放堆栈）',
+    `durationMs`       int           NULL COMMENT '总耗时（毫秒），含所有轮次',
+    `rounds`           tinyint       NOT NULL DEFAULT 0 COMMENT '生成-审查循环轮数，0 表示没进循环',
+    `qualityScore`     tinyint       NULL COMMENT '最终一轮审查分数（失败或未评审时为空）',
+    `llmCalls`         int           NOT NULL DEFAULT 0 COMMENT '模型调用次数（AGENT_MODEL_FINISHED 事件数）',
+    `promptTokens`     int           NOT NULL DEFAULT 0 COMMENT '输入 token 合计',
+    `completionTokens` int           NOT NULL DEFAULT 0 COMMENT '输出 token 合计',
+    `totalTokens`      int           NOT NULL DEFAULT 0 COMMENT '总 token 合计',
+    `byAgent`          json          NULL COMMENT '按 Agent 分摊的 token：{"planner_agent":123}',
+    `usageSource`      varchar(16)   NOT NULL DEFAULT 'gateway' COMMENT '用量来源：gateway-网关返回 estimated-本地估算 none-无数据',
+    `createTime`       datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_traceId` (`traceId`),
+    INDEX `idx_userId_createTime` (`userId`, `createTime`),
+    INDEX `idx_paperId` (`paperId`),
+    INDEX `idx_createTime` (`createTime`)
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '试卷生成日志（含token消耗）' ROW_FORMAT = Dynamic;

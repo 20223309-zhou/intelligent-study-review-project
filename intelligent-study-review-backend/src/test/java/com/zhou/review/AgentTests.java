@@ -2,9 +2,11 @@ package com.zhou.review;
 
 import cn.hutool.json.JSONUtil;
 import com.alibaba.cloud.ai.graph.NodeOutput;
+import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.agent.flow.agent.SequentialAgent;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
+import com.alibaba.cloud.ai.graph.streaming.OutputType;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.zhou.review.agents.AsyncGenExamPaper;
 import com.zhou.review.model.entity.ExamPaper;
@@ -13,6 +15,10 @@ import com.zhou.review.model.vo.ExamPaperVO;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -21,6 +27,7 @@ import reactor.core.publisher.Flux;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.PrimitiveIterator;
 
 import static com.zhou.review.model.enums.QuestionConfigEnum.*;
@@ -295,7 +302,7 @@ class AgentTests {
     }
 
     @Test
-    void contextLoads() {
+    void contextLoads() throws GraphRunnerException {
         // 创建专业化的子Agent
         ReactAgent writerAgent = ReactAgent.builder()
                 .name("writer_agent")
@@ -321,16 +328,29 @@ class AgentTests {
                 .description("根据用户给定的主题写一篇文章，然后将文章交给评论员进行评论")
                 .subAgents(List.of(writerAgent, reviewerAgent))
                 .build();
+
+//        Optional<OverAllState> result = blogAgent.invoke("帮我写一个100字左右的玄幻小说");
+//        OverAllState state = result.get();
+//        state.data().forEach((k, v) -> System.out.println(k + " -> " + v));
+//        state.value("messages").ifPresent(o -> ((List<Message>) o)
+//                .forEach(m -> System.out.println(m.getMessageType() + " meta=" + m.getMetadata())));
+
         Flux<NodeOutput> result;
-        // 使用
+
         try {
-            result = blogAgent.stream("帮我写一个100字左右的散文");
+            result = blogAgent.stream("帮我写一个100字左右的玄幻小说");
         } catch (GraphRunnerException e) {
             throw new RuntimeException(e);
         }
-        result.doOnNext(output ->{
+        result
+                .doOnNext(output ->{
             // 1. 判断是否为流式输出对象
             if (output instanceof StreamingOutput<?> streamingOutput) {
+                if (streamingOutput.getOutputType() == OutputType.AGENT_MODEL_FINISHED) {
+                    Usage u = output.tokenUsage();
+                    System.out.println("usage:  TotalTokens=" + u.getTotalTokens() + "; PromptTokens=" + u.getPromptTokens() +
+                            "; CompletionTokens=" + u.getCompletionTokens() + "; NativeUsage=" + u.getNativeUsage());
+                }
                 // 2. 获取消息体
                 var message = streamingOutput.message();
 
@@ -339,28 +359,23 @@ class AgentTests {
                     String text = assistantMessage.getText();
                     // 打印出当前是哪个节点在输出
                     String nodeName = output.agent();
+                    String node = output.node();
                     if (text != null && !text.isEmpty()) {
-                        System.out.println("[" + nodeName + "] " + text);
+                        System.out.println("[" + node + "][" + nodeName + "] " + text);
                     }
                 }
+
             }
-        }).blockLast();
-//        if (result.isPresent()) {
-//            OverAllState state = result.get();
-//
-//            // 访问第一个Agent的输出
-//            state.value("article").ifPresent(article -> {
-//                if (article instanceof AssistantMessage) {
-//                    System.out.println("原始文章: " + ((AssistantMessage) article).getText());
-//                }
-//            });
-//
-//            // 访问第二个Agent的输出
-//            state.value("reviewed_article").ifPresent(reviewedArticle -> {
-//                if (reviewedArticle instanceof AssistantMessage) {
-//                    System.out.println("评审后文章: " + ((AssistantMessage) reviewedArticle).getText());
-//                }
-//            });
-//        }
+        })
+                .blockLast();
     }
+
+    @Test
+    void usageProbe() {
+        ChatResponse resp = openAiChatModel.call(new Prompt("用一句话介绍杭州。"));
+        Usage u = resp.getMetadata().getUsage();
+        System.out.println("NON-STREAM usage = " + u);
+        System.out.println("native = " + u.getNativeUsage());
+    }
+
 }

@@ -9,7 +9,9 @@ import com.alibaba.cloud.ai.graph.agent.flow.agent.loop.ConditionLoopStrategy;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.alibaba.cloud.ai.graph.streaming.OutputType;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
+import com.zhou.review.agents.progress.GenerationMetrics;
 import com.zhou.review.agents.progress.GenerationProgressSink;
+import com.zhou.review.agents.progress.StageGate;
 import com.zhou.review.constant.PromptConstant;
 import com.zhou.review.exception.BusinessException;
 import com.zhou.review.exception.ErrorCode;
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
@@ -43,6 +46,16 @@ public class AsyncGenExamPaper {
      */
     private static final int QUALITY_PASS_SCORE = 8;
 
+    /**
+     * 我们自己给「容器」起的名字。框架会把 FlowAgent 编译成子图，子图的入口/派发/出口节点
+     * 也会产出 NodeOutput，agent 字段就是这些名字 —— 它们不是"某个 Agent 在干活"，
+     * 推给用户只会让进度里混进 work flowAgent 这种没意义的行。命名集中在这里，
+     * 建图与过滤共用同一份常量，改名不会漏。
+     */
+    private static final String WORKFLOW_AGENT = "workflowAgent";
+    private static final String LOOP_AGENT = "exam_paper_agent";
+    private static final String WRITE_REVIEW_AGENT = "write_review_agent";
+
     @Resource
     private OpenAiChatModel openAiChatModel;
 
@@ -53,7 +66,7 @@ public class AsyncGenExamPaper {
      * @return
      */
     public ExamPaperVO generateExamPaper(ExamPaper examPaper) {
-        return run(examPaper, null);
+        return generateExamPaper(examPaper, GenerationProgressSink.NOOP, new GenerationMetrics());
     }
 
     /**
@@ -65,22 +78,29 @@ public class AsyncGenExamPaper {
      * @return 反序列化后的试卷 VO；拿不到时返回 null
      */
     public ExamPaperVO generateExamPaper(ExamPaper examPaper, GenerationProgressSink sink) {
-        return run(examPaper, sink);
+        return generateExamPaper(examPaper, sink, new GenerationMetrics());
     }
 
-    private ExamPaperVO run(ExamPaper examPaper, GenerationProgressSink sink) {
+    /**
+     * 带用量统计的生成。metrics 由调用方创建（每次生成一个，不能共享），
+     * 生成结束后从这里读 token / 轮数 / traceId 落日志。
+     */
+    public ExamPaperVO generateExamPaper(ExamPaper examPaper, GenerationProgressSink sink,
+                                         GenerationMetrics metrics) {
+        return run(examPaper, sink == null ? GenerationProgressSink.NOOP : sink, metrics);
+    }
+
+    private ExamPaperVO run(ExamPaper examPaper, GenerationProgressSink sink, GenerationMetrics metrics) {
         SequentialAgent workflowAgent = buildWorkflowAgent();
         Map<String, Object> inputMap = buildInput(examPaper);
 
         Optional<OverAllState> result;
         try {
-            // SSE连接为空则不采用流式输出
-            if (sink == null) {
-                result = workflowAgent.invoke(inputMap);
-            } else {
-                // 流式输出
-                result = runStream(workflowAgent, inputMap, sink);
-            }
+            // 统一走 stream。原来 sink == null 时走 invoke，但 invoke 只回 OverAllState，
+            // 而 state 里没有 token 用量（实测只有 input/messages/各 outputKey），
+            // 那样同步接口就永远统计不到消耗。sink 传 NOOP 时对调用方完全无感，
+            // 只是底层多消费若干个事件。
+            result = runStream(workflowAgent, inputMap, sink, metrics);
         } catch (GraphRunnerException e) {
             log.error("试卷生成失败", e);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "试卷生成失败");
@@ -99,10 +119,11 @@ public class AsyncGenExamPaper {
      */
     private Optional<OverAllState> runStream(SequentialAgent workflowAgent,
                                              Map<String, Object> inputMap,
-                                             GenerationProgressSink sink) throws GraphRunnerException {
+                                             GenerationProgressSink sink,
+                                             GenerationMetrics metrics) throws GraphRunnerException {
         AtomicReference<OverAllState> lastState = new AtomicReference<>();
         AtomicInteger reviewRound = new AtomicInteger(0);
-        AtomicReference<String> lastStageKey = new AtomicReference<>();
+        StageGate stageGate = new StageGate(WORKFLOW_AGENT, LOOP_AGENT, WRITE_REVIEW_AGENT);
         AtomicReference<String> lastReviewText = new AtomicReference<>();
 
         workflowAgent.stream(inputMap)
@@ -112,17 +133,26 @@ public class AsyncGenExamPaper {
                         lastState.set(state);
                     }
 
-                    // —— 阶段：同一节点的连续事件（token 级）只推第一次 ——
-                    String stageKey = stageKey(output.node(), output.agent());
-                    if (!stageKey.isEmpty() && !stageKey.equals(lastStageKey.getAndSet(stageKey))) {
-                        // 轮次 = 已完成的审查轮数 + 1：writer/reviewer 都在本轮内
-                        sink.stage(output.node(), output.agent(), reviewRound.get() + 1);
+                    // —— 阶段：同一「语义阶段」在同一轮内只推第一次 ——
+                    // 具体规则见 StageGate：按展示文案去重（不是 node|agent），
+                    // 并丢掉没有 agent 的图包装节点。
+                    int stageRound = reviewRound.get() + 1;
+                    if (stageGate.accept(output.node(), output.agent(), stageRound)) {
+                        sink.stage(output.node(), output.agent(), stageRound);
                     }
 
                     // —— token 级增量：只作活性指示，由 sink 自行节流 ——
                     if (output instanceof StreamingOutput<?> streamingOutput
                             && streamingOutput.getOutputType() == OutputType.AGENT_MODEL_STREAMING) {
                         sink.token(streamingOutput.agent(), streamingOutput.chunk());
+                    }
+
+                    // —— 用量：只在「模型完成」事件上取 ——
+                    // 流式增量事件每个 token 一条且 usage 是空壳，累加会放大几十倍；
+                    // 网关没开 stream-usage 时 usage 全 0，addUsage 内部会忽略并保持 usageSource=none。
+                    if (output instanceof StreamingOutput<?> finished
+                            && finished.getOutputType() == OutputType.AGENT_MODEL_FINISHED) {
+                        metrics.addUsage(finished.agent(), output.tokenUsage());
                     }
 
                     // —— 审查轮次：同一份审查报告只计一次 ——
@@ -135,6 +165,7 @@ public class AsyncGenExamPaper {
                         if (score != null && reviewText != null && !reviewText.isBlank()
                                 && !reviewText.equals(lastReviewText.getAndSet(reviewText))) {
                             sink.review(reviewRound.incrementAndGet(), score, score >= QUALITY_PASS_SCORE);
+                            metrics.setQualityScore(score);
                         }
                     }
                 })
@@ -144,19 +175,15 @@ public class AsyncGenExamPaper {
                 })
                 .blockLast();
 
-        return Optional.ofNullable(lastState.get());
-    }
-
-    /**
-     * 阶段去重用的键。node 与 agent 任一变化都算新阶段。
-     */
-    private static String stageKey(String node, String agent) {
-        String n = node == null ? "" : node;
-        String a = agent == null ? "" : agent;
-        if (n.isEmpty() && a.isEmpty()) {
-            return "";
+        OverAllState finalState = lastState.get();
+        if (finalState != null) {
+            // 图执行ID：把一次生成的所有环节串起来的 trace id，落日志用
+            finalState.value("_graph_execution_id_")
+                    .ifPresent(id -> metrics.setTraceId(String.valueOf(id)));
         }
-        return n + "|" + a;
+        metrics.setRounds(reviewRound.get());
+
+        return Optional.ofNullable(finalState);
     }
 
     /**
@@ -224,14 +251,14 @@ public class AsyncGenExamPaper {
 
         // 创建试卷生成与审查的顺序执行子Agent
         SequentialAgent writeReviewAgent = SequentialAgent.builder()
-                .name("write_review_agent")
+                .name(WRITE_REVIEW_AGENT)
                 .description("试卷生成与审查Agent")
                 .subAgents(List.of(writerAgent, reviewerAgent))
                 .build();
 
         // 创建试卷生成审查循环agent
         LoopAgent loopAgent = LoopAgent.builder()
-                .name("exam_paper_agent")
+                .name(LOOP_AGENT)
                 .description("试卷生成审查循环Agent")
                 .subAgent(writeReviewAgent)
                 .loopStrategy(getConditionLoopStrategy())
@@ -239,7 +266,7 @@ public class AsyncGenExamPaper {
 
         // 创建完整的工作流 Agent：计划 -> （生成 -> 审查）循环
         return SequentialAgent.builder()
-                .name("workflowAgent")
+                .name(WORKFLOW_AGENT)
                 .description("试卷生成工作流，计划->生成->审查")
                 .subAgents(List.of(plannerAgent, loopAgent))
                 .build();

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { checkLogin, logoutUser } from '@/utils/auth.js'
 import UiFeedback from '@/components/ui/UiFeedback.vue'
@@ -8,6 +8,9 @@ import BrandLogo from '@/components/BrandLogo.vue'
 const router = useRouter()
 const route = useRoute()
 const currentUser = ref(null)
+
+/** 管理员入口只对 admin 展示；非管理员就算手动输入 hash 也会被路由守卫弹回 */
+const isAdmin = computed(() => currentUser.value?.userRole === 'admin')
 
 onMounted(async () => {
   await refreshUser()
@@ -66,6 +69,19 @@ async function handleLogout() {
               <line x1="16" y1="17" x2="8" y2="17"/>
             </svg>
             我的试卷
+          </router-link>
+
+          <router-link v-if="isAdmin" to="/admin/logs" class="nav-link"
+            :class="{ active: $route.path.startsWith('/admin') }">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="9" y1="6" x2="21" y2="6"/>
+              <line x1="9" y1="12" x2="21" y2="12"/>
+              <line x1="9" y1="18" x2="21" y2="18"/>
+              <circle cx="4" cy="6" r="1.2"/>
+              <circle cx="4" cy="12" r="1.2"/>
+              <circle cx="4" cy="18" r="1.2"/>
+            </svg>
+            生成日志
           </router-link>
 
           <template v-if="currentUser">

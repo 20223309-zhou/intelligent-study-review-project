@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhou.review.agents.AsyncGenExamPaper;
 import com.zhou.review.agents.ExamAiGrader;
+import com.zhou.review.agents.progress.GenerationMetrics;
 import com.zhou.review.agents.progress.GenerationProgressSink;
 import com.zhou.review.exception.BusinessException;
 import com.zhou.review.exception.ErrorCode;
@@ -17,6 +18,7 @@ import com.zhou.review.model.vo.ExamPaperGradeVO;
 import com.zhou.review.model.vo.ExamPaperVO;
 import com.zhou.review.model.vo.QuestionVO;
 import com.zhou.review.service.ExamPaperService;
+import com.zhou.review.service.GenerationLogService;
 import com.zhou.review.service.QuestionService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zhou.review.utils.RedisCacheUtil;
@@ -58,17 +60,35 @@ public class ExamPaperServiceImpl extends ServiceImpl<ExamPaperMapper, ExamPaper
     private RedisCacheUtil redisCacheUtil;
 
     @Resource
+    private GenerationLogService generationLogService;
+
+    @Resource
     private PlatformTransactionManager transactionManager;
 
     /**
-     * 生成考试试卷
-     * @param examPaper 试卷信息
-     * @return 试卷信息
+     * 生成考试试卷（同步接口）。
+     * 不再整段加事务：生成要跑几十秒到几分钟，包进事务等于每个请求占着一条数据库连接，
+     * 并发几个就把连接池吃满（SSE 那条路早就这么做了，这里对齐）。
+     * 只有落库那一步开事务，日志写在事务之外 —— 否则失败回滚会把"失败日志"一起滚掉。
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public ExamPaperVO generateExamPaper(ExamPaper examPaper) {
-        return persistGenerated(examPaper, asyncGenExamPaper.generateExamPaper(examPaper));
+        GenerationMetrics metrics = new GenerationMetrics();
+        long start = System.currentTimeMillis();
+        try {
+            ExamPaperVO examPaperVO = asyncGenExamPaper.generateExamPaper(
+                    examPaper, GenerationProgressSink.NOOP, metrics);
+            ExamPaperVO saved = new TransactionTemplate(transactionManager)
+                    .execute(status -> persistGenerated(examPaper, examPaperVO));
+            generationLogService.recordSuccess(examPaper, saved, metrics,
+                    System.currentTimeMillis() - start);
+            return saved;
+        } catch (RuntimeException e) {
+            // 生成失败 or 落库失败都要留痕：否则算不出失败率，也发现不了"某类配置必然失败"
+            generationLogService.recordFailure(examPaper, metrics,
+                    System.currentTimeMillis() - start, e);
+            throw e;
+        }
     }
 
     /**
@@ -82,14 +102,24 @@ public class ExamPaperServiceImpl extends ServiceImpl<ExamPaperMapper, ExamPaper
         if (examPaper == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "试卷不存在");
         }
-        ExamPaperVO examPaperVO = asyncGenExamPaper.generateExamPaper(examPaper, sink);
-        ExamPaperVO saved = new TransactionTemplate(transactionManager)
-                .execute(status -> persistGenerated(examPaper, examPaperVO));
-        // 落库成功后才通知"完成"——此时试卷ID与题目都已经入库
-        if (sink != null) {
-            sink.done(saved);
+        GenerationMetrics metrics = new GenerationMetrics();
+        long start = System.currentTimeMillis();
+        try {
+            ExamPaperVO examPaperVO = asyncGenExamPaper.generateExamPaper(examPaper, sink, metrics);
+            ExamPaperVO saved = new TransactionTemplate(transactionManager)
+                    .execute(status -> persistGenerated(examPaper, examPaperVO));
+            generationLogService.recordSuccess(examPaper, saved, metrics,
+                    System.currentTimeMillis() - start);
+            // 落库成功后才通知"完成"——此时试卷ID与题目都已经入库
+            if (sink != null) {
+                sink.done(saved);
+            }
+            return saved;
+        } catch (RuntimeException e) {
+            generationLogService.recordFailure(examPaper, metrics,
+                    System.currentTimeMillis() - start, e);
+            throw e;
         }
-        return saved;
     }
 
     /**
@@ -113,16 +143,17 @@ public class ExamPaperServiceImpl extends ServiceImpl<ExamPaperMapper, ExamPaper
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "生成的试卷没有题目");
         }
         // 保存题目到 question 表，直接关联试卷ID
-        questions.forEach(questionVO -> {
+        List<Question> newQuestions = questions.stream().map(questionVO -> {
             Question question = BeanUtil.copyProperties(questionVO, Question.class);
             question.setPaperId(examPaper.getId());
             question.setSortOrder(questionVO.getSortOrder());
             question.setScore(questionVO.getScore());
-            boolean save = questionService.save(question);
-            if (!save) {
-                throw new BusinessException(ErrorCode.OPERATION_ERROR, "保存题目失败");
-            }
-        });
+            return question;
+        }).toList();
+        boolean save = questionService.saveBatch(newQuestions);
+        if (!save) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "保存题目失败");
+        }
         return examPaperVO;
     }
 
