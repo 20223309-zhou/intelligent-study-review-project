@@ -1,5 +1,6 @@
 # 智卷派 · AI 智能试卷生成与批改平台
 
+[![GitHub](https://img.shields.io/badge/GitHub-20223309--zhou%2Fintelligent--study--review--project-181717?logo=github&logoColor=white)](https://github.com/20223309-zhou/intelligent-study-review-project)
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.15-6DB33F?logo=springboot&logoColor=white)
 ![Spring AI](https://img.shields.io/badge/Spring_AI-1.1.2-6DB33F?logo=spring&logoColor=white)
@@ -13,6 +14,8 @@
 
 > 填写学科、年级与题型要求，由多个 AI Agent 协作产出一份结构完整、分值自洽的试卷；学生在线作答后自动批改，并给出按题型与知识点的成绩分析。
 
+**仓库地址**：<https://github.com/20223309-zhou/intelligent-study-review-project>
+
 **智卷派**是一个前后端分离的智能组卷与复习系统。与"把题目丢给大模型直接生成"的常见做法不同，它把命题拆成 **规划 → 生成 → 审查 → 回炉** 的多 Agent 工作流：Writer 产出整卷后，Reviewer 会从结构一致性、分值校验、内容专业性三个维度打分，未达标就带着修改意见退回重写，直到通过质检或达到轮次上限。生成过程中每一步都通过 SSE 实时推到前端，而不是让用户对着"加载中"干等。
 
 ---
@@ -23,6 +26,10 @@
 
 ![试卷生成](./docs/images/exam-generator.png)
 
+### 生成进度时间线
+![生成进度](./docs/images/generation-progress.png)
+
+
 ### 在线答题：倒计时、答题卡与吸底提交
 
 ![在线答题](./docs/images/paper-detail-exam.png)
@@ -31,7 +38,6 @@
 
 ![判分结果](./docs/images/grading-result.png)
 
-![结果总览](./docs/images/grading-overview.png)
 
 ### 成绩分析：按题型与知识点定位薄弱环节
 
@@ -43,13 +49,12 @@
 
 ![登录页](./docs/images/login.png)
 
-<!--
-  📷 建议再补一张：生成进度时间线
-  「多 Agent 阶段流式输出」是本项目最有辨识度的能力，但目前截图里没有体现它。
-  需要一张「正在生成试卷」时的截图（阶段 + 第几轮 + 审查评分那串时间线），
-  存为 ./docs/images/generation-progress.png，然后在上方「试卷生成」小节末尾加一行：
-    ![生成进度](./docs/images/generation-progress.png)
--->
+### 生成日志与监控
+
+![日志页](./docs/images/log-record.png)
+
+
+
 
 ---
 
@@ -81,7 +86,9 @@ Prompt 模板集中在 `PromptConstant`，并做了三件工程化的事：**模
 - 生成任务丢进专用线程池执行，**不再占用 Tomcat 请求线程**
 - 前端把进度累积成**保留式时间线**（不覆盖），生成结束后仍可在结果页回看完整轨迹
 
-> 踩过的坑值得记一笔：图框架 `stream()` 的每个 `NodeOutput` **不等于**"一个节点跑完" —— 默认会吐 token 级事件，一次生成里单个节点可产出数百个事件。任何按"事件数"计轮次或推进度的逻辑都会失效（实测轮次曾飙到 838）。所以阶段与轮次都按"节点是否变化 / 审查报告文本是否变化"做了去重。
+> 踩过的坑值得记一笔：图框架 `stream()` 的每个 `NodeOutput` **不等于**"一个节点跑完" —— 默认会吐 token 级事件，一次生成里单个节点可产出数百个事件。任何按"事件数"计轮次或推进度的逻辑都会失效（实测轮次曾飙到 838）。
+>
+> 但"按节点去重"同样不行：一个 Agent 内部会先后出现子图包装节点、Agent 节点、`agent` 为空的图节点，它们的 `(node, agent)` 各不相同，翻译出来却是同一句"正在规划试卷结构"，于是一句话被推了三遍；再加上 `workflowAgent` 这类**容器节点**（它是我们建图时给 FlowAgent 起的名字，只是子图的入口/派发/出口），界面上会混进一堆没有业务含义的行。最终把去重逻辑抽成 `StageGate`：**按「展示文案 + 轮次」去重**，并**按名字精确匹配丢弃容器节点**。这段是纯逻辑，配了单测直接喂真实事件序列做回归。
 
 ### 3. 主观题 AI 判分：整卷一次请求 + 结果缓存 + 失败降级
 
@@ -105,6 +112,18 @@ Prompt 模板集中在 `PromptConstant`，并做了三件工程化的事：**模
 
 倒计时（时间到自动交卷）、答题卡导航（已答/未答/当前题、按题型分组）、草稿保护（`localStorage` 防抖暂存，重进可恢复）、错题重做（先回填上次作答，只清空错题）、键盘操作（`↑↓` 切题、字母/数字选项）、移动端吸底操作栏。结果页是**五态**标记：`✓ 答对 / ✗ 答错 / 部分 / 未答 / 待评`。
 
+### 6. 生成日志与用量统计（管理员）
+
+每完成一次生成，落一行 `generation_log`：`traceId`（图执行的 `_graph_execution_id_`）、试卷、状态、耗时、循环轮数、最终评分、`prompt / completion / total` 三个 token 字段、按 Agent 分摊的 `byAgent`（JSON）、以及**用量来源** `usageSource`。
+
+管理端 `/admin/logs` 提供四张概览卡片（次数/成功率/总 token/平均耗时）、近 7/14/30 天的消耗趋势、以及可筛选可展开的明细表（失败原因、按 Agent 的分摊、traceId）。
+
+三个不那么显然的工程结论：
+
+- **token 用量只存在于 `NodeOutput.tokenUsage()`**，`OverAllState` 里没有（实测只有 `_graph_execution_id_ / input / messages / 各 outputKey`）。所以同步接口原来那条 `invoke` 路径永远统计不到消耗 —— 现已统一走 `stream()`，`sink` 传空实现，对调用方无感。
+- **流式响应默认不返回 usage**，必须在配置里打开 `stream-usage: true`（对应 `stream_options.include_usage`）。没开时拿到的是全 0 且 `NativeUsage={}` 空 Map —— **全 0 不等于没消耗，是没数据**，所以表里专门留了 `usageSource` 来区分这两件事。
+- **只认 `AGENT_MODEL_FINISHED` 事件**累加。`AGENT_MODEL_STREAMING` 每 token 一条，累加会把用量放大几十倍；一次生成大约 7 次模型调用，要求的是"求和"而不是"取最后一个"。
+
 ---
 
 ## 技术栈
@@ -119,6 +138,7 @@ Prompt 模板集中在 `PromptConstant`，并做了三件工程化的事：**模
 | 持久化 | MyBatis-Plus **3.5.15** + MySQL；对话记忆用 `JdbcChatMemoryRepository` |
 | 会话 / 缓存 | Redis + Spring Session（session 与 cookie 均为 30 天） |
 | 接口文档 | Knife4j **4.4.0**（OpenAPI 3） |
+| 用量统计 | 自建 `generation_log` 表：阶段去重、token 采集（`NodeOutput.tokenUsage()`）、管理员看板 |
 | 其他 | Hutool 5.8.43、Lombok、Spring AOP、easy-captcha 1.6.2 |
 
 ### 前端
@@ -138,14 +158,19 @@ Prompt 模板集中在 `PromptConstant`，并做了三件工程化的事：**模
 
 ```
 com.zhou.review
-├── controller      REST 接口（统一返回 BaseResponse）
-├── service         业务接口 + impl
+├── controller      REST 接口（统一返回 BaseResponse；含 GenerationLogController）
+├── service         业务接口 + impl（含 GenerationLogService：落库与管理员查询）
 ├── mapper          MyBatis-Plus Mapper（+ resources/mapper/*.xml）
 ├── model           entity / dto / vo / enums
 ├── agents          AI Agent 编排与判分
-│   ├── AsyncGenExamPaper          多 Agent 工作流（invoke / stream 两条路径）
+│   ├── AsyncGenExamPaper          多 Agent 工作流（统一走 stream）
 │   ├── ExamAiGrader               主观题判分（整卷一次请求 + 缓存 + 降级）
-│   └── progress/                  GenerationProgressSink / SseProgressSink
+│   └── progress/                  进度与用量
+│       ├── GenerationProgressSink 进度回调接口（含 NOOP）
+│       ├── SseProgressSink        写 SSE 事件（token 节流 + 心跳）
+│       ├── StageLabels            (node, agent) → 中文阶段名
+│       ├── StageGate              阶段去重（按文案 + 轮次，丢弃容器节点）
+│       └── GenerationMetrics      每请求一份的用量采集器
 ├── config          ChatClient、ChatMemory、Json、MyBatisPlus、生成线程池
 ├── aspect          AuthInterceptor（自定义 @AuthCheck 注解做角色校验）
 ├── constant        PromptConstant、UserConstant
@@ -165,9 +190,10 @@ ExamPaperController ──► generationExecutor（专用线程池）
                               ▼
                     AsyncGenExamPaper.stream()
                     Planner ─► (Writer ─► Reviewer) × ≤3
-                              │  每个 NodeOutput 去重后推 stage / review
+                              │  每个 NodeOutput 经 StageGate 去重后推 stage / review
+                              │  同时累加 token 用量
                               ▼
-                     落库 exam_paper + question ──► done 事件
+                     落库 exam_paper + question ──► generation_log ──► done 事件
   │
   │  POST /api/exam-paper/grade                   提交作答
   ▼
@@ -192,10 +218,10 @@ intelligent_study_review_project/
     ├── vite.config.js
     ├── public/favicon.png
     └── src/
-        ├── pages/                      5 个页面（生成/列表/详情/登录/注册）
-        ├── components/                 业务组件 + ui/ 基元组件
-        ├── utils/                      auth / exportWord / generationStream / ui
-        ├── router/
+        ├── pages/                      6 个页面（生成/列表/详情/登录/注册/管理员日志）
+        ├── components/                 业务组件（MathText / PaperNotes / PageDecor…）+ ui/ 基元组件
+        ├── utils/                      auth / exportWord / generationStream / mathRender / ui
+        ├── router/                     路由与管理员守卫
         └── styles/global.css           设计系统令牌总入口
 ```
 
@@ -219,7 +245,10 @@ intelligent_study_review_project/
 mysql -u root -p < intelligent-study-review-backend/sql/create_table.sql
 ```
 
-> 脚本会建库并创建 `user`、`exam_paper`、`question` 三张表，可重复执行。Spring AI 的对话记忆表由应用启动时自动创建（`initialize-schema: always`），无需手工建。
+> 脚本会建库并创建 `user`、`exam_paper`、`question`、`generation_log` 四张表，可重复执行。Spring AI 的对话记忆表由应用启动时自动创建（`initialize-schema: always`），无需手工建。
+>
+> 管理员后台（`/admin/logs`）需要账号的 `userRole` 为 `admin`：
+> `UPDATE user SET userRole='admin' WHERE userAccount='你的账号';`。不设也没关系 —— 只是入口不显示、接口会返回无权限。
 
 ### 2. 配置后端
 
@@ -249,6 +278,9 @@ spring:
           model: deepseek-flash
           temperature: 0.7
           max-tokens: 8192
+          # 必须打开：流式响应默认不返回 token 用量，
+          # 关掉的话生成日志里的 token 会全是 0（而且看起来像"真的没消耗"）
+          stream-usage: true
 ```
 
 ### 3. 启动后端
@@ -311,6 +343,19 @@ event: review   {"round":2,"qualityScore":8,"passed":true}
 event: done     {"paperName":"...","totalScore":100,"questionCount":21}
 ```
 
+> `stage` 的 `node` / `agent` 是框架原样给出的，可能带 `subgraph_` 前缀；前端**只用 `label` 展示**，不要对节点名做全等匹配。容器节点（`workflowAgent` / `exam_paper_agent` / `write_review_agent`）不会出现在事件流里。
+
+### 生成日志（仅管理员）
+
+`@AuthCheck(mustRole = "admin")`，非管理员返回无权限。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/generation-log/page` | 分页查询，支持 `status` / `subject` / `keyword` / `startTime` / `endTime` / `userId` |
+| GET | `/generation-log/stats?days=7` | 近 N 天汇总（次数、成功率、token、平均耗时、每日趋势，缺失日期补 0） |
+
+列表返回的 `byAgent` 已解析成对象（库里存的是 JSON 文本）；`totalTokens` 为 0 时请结合 `usageSource` 判断是"真没消耗"还是"没采到数据"。
+
 ---
 
 ## 实现要点
@@ -331,8 +376,10 @@ event: done     {"paperName":"...","totalScore":100,"questionCount":21}
 - 试卷生成是长耗时任务（数十秒至数分钟），依赖 AI 服务的稳定性
 - 主观题 AI 判分的评分尺度依赖模型输出质量，同一作答已用缓存保证分数稳定，但**评分标准本身仍需人工校准**
 - PDF 导出依赖 CDN 上的 `html2pdf.js`，离线环境不可用
+- **token 统计依赖模型网关返回 usage**：流式请求必须带 `stream_options.include_usage`（见上文 `stream-usage: true`）。部分第三方中转会丢弃该字段，此时 `generation_log` 里 token 为 0、`usageSource` 为 `none` —— 这不是"没消耗"，是没采到
+- 生成日志表会随时间增长，目前没有归档策略，需要手动按时间窗口清理
 - 知识点维度的得分率按题目累计 —— 一道题挂多个知识点会被各自计入一次，因此各知识点满分之和可能大于试卷总分
-- 测试覆盖有限，尚无 CI 流程
+- 测试覆盖有限（目前只有阶段去重的单元测试），尚无 CI 流程
 
 ---
 
